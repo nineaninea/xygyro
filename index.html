@@ -195,7 +195,7 @@ function playBeep() {
   osc.connect(gain); gain.connect(audioCtx.destination);
   osc.type = 'sine'; osc.frequency.value = 1200; gain.gain.value = 0.3;
   const now = audioCtx.currentTime;
-  osc.start(now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12); osc.stop(now + 0.12);
+  osc.start(now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06); osc.stop(now + 0.06);
 }
 
 function playDong() {
@@ -205,7 +205,7 @@ function playDong() {
   osc.connect(gain); gain.connect(audioCtx.destination);
   osc.type = 'sine'; osc.frequency.value = 400; gain.gain.value = 0.35;
   const now = audioCtx.currentTime;
-  osc.start(now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2); osc.stop(now + 0.2);
+  osc.start(now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08); osc.stop(now + 0.08);
 }
 
 let alertState = 'ok';
@@ -218,7 +218,7 @@ function startAlertLoop() {
     if (alertState === 'y') playBeep();
     else if (alertState === 'x') playDong();
     else if (alertState === 'both') { if (bothToggle) playBeep(); else playDong(); bothToggle = !bothToggle; }
-  }, 300);
+  }, 125);
 }
 
 function stopAlertLoop() { if (soundTimer) { clearInterval(soundTimer); soundTimer = null; } }
