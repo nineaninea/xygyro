@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>X/Y Acceleration Chart</title>
+<title>Driving Comfort Monitor</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -25,14 +25,45 @@
   .btn-perm { background: linear-gradient(135deg, #4a90d9, #357abd); }
   .btn-reset { background: linear-gradient(135deg, #868e96, #495057); }
 
-  .chart-label {
-    width: 100%; max-width: 460px;
-    font-size: 0.75rem; font-weight: 700; margin-bottom: 4px; padding-left: 4px;
+  .settings {
+    width: 100%; max-width: 460px; background: #12122a; border-radius: 12px;
+    padding: 14px; border: 1px solid #1e1e40; margin-bottom: 14px;
   }
-  .chart-label .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  .settings-title { font-size: 0.7rem; color: #7eb8ff; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+  .setting-row {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+  }
+  .setting-row:last-child { margin-bottom: 0; }
+  .setting-label { font-size: 0.82rem; color: #aaa; flex: 1; }
+  .setting-input {
+    width: 80px; padding: 8px 10px; border-radius: 8px; border: 1px solid #333;
+    background: #1a1a35; color: #fff; font-size: 0.95rem; font-weight: 600;
+    text-align: center; font-variant-numeric: tabular-nums;
+  }
+  .setting-input:disabled { opacity: 0.4; }
+  .setting-unit { font-size: 0.75rem; color: #666; margin-left: 6px; min-width: 40px; }
+
+  .alert-bar {
+    width: 100%; max-width: 460px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; font-weight: 700; margin-bottom: 14px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .alert-bar.ok { background: #0a2010; color: #2d8a4e; border: 1px solid #1a3a20; }
+  .alert-bar.warn-y { background: #2a1a0a; color: #ff6b6b; border: 1px solid #4a2a1a; animation: pulse 0.5s infinite; }
+  .alert-bar.warn-x { background: #1a1a0a; color: #fcc419; border: 1px solid #3a3a1a; animation: pulse 0.6s infinite; }
+  .alert-bar.warn-both { background: #2a0a0a; color: #ff4444; border: 1px solid #4a1a1a; animation: pulse 0.3s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+  .legend {
+    width: 100%; max-width: 460px; display: flex; justify-content: center;
+    gap: 20px; font-size: 0.73rem; color: #888; margin-bottom: 6px;
+  }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .legend .dot { width: 12px; height: 3px; border-radius: 2px; }
 
   .chart-container {
-    width: 100%; max-width: 460px; height: 220px;
+    width: 100%; max-width: 460px; height: 240px;
     background: #0d0d24; border-radius: 16px; border: 1px solid #1e1e40;
     position: relative; overflow: hidden; margin-bottom: 14px;
   }
@@ -62,32 +93,42 @@
   .cal-overlay.hidden { display: none; }
   .cal-icon { font-size: 3rem; margin-bottom: 16px; }
   .cal-title { color: #fcc419; font-size: 1.2rem; font-weight: 700; margin-bottom: 8px; }
-  .cal-desc { color: #888; font-size: 0.9rem; text-align: center; line-height: 1.5; margin-bottom: 20px; max-width: 300px; }
+  .cal-desc { color: #888; font-size: 0.9rem; text-align: center; line-height: 1.6; margin-bottom: 20px; max-width: 320px; }
+  .cal-desc em { color: #fcc419; font-style: normal; font-weight: 600; }
   .cal-bar { width: 200px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; margin-bottom: 10px; }
   .cal-fill { height: 100%; background: #fcc419; border-radius: 4px; transition: width 0.1s; width: 0%; }
   .cal-status { color: #aaa; font-size: 0.8rem; }
-
-  .legend {
-    width: 100%; max-width: 460px; display: flex; justify-content: center;
-    gap: 20px; font-size: 0.75rem; color: #888; margin-bottom: 8px;
-  }
-  .legend span { display: flex; align-items: center; gap: 5px; }
-  .legend .dot { width: 12px; height: 3px; border-radius: 2px; }
 </style>
 </head>
 <body>
 
-<h1>📊 Horizontal Acceleration</h1>
-<div class="subtitle">X &amp; Y acceleration in the plane ⊥ to gravity</div>
+<h1>🚗 Driving Comfort Monitor</h1>
+<div class="subtitle">X &amp; Y acceleration with audio alerts</div>
 
 <div class="controls">
   <button class="btn btn-perm" id="permBtn" onclick="requestPermission()">Grant Sensors</button>
   <button class="btn btn-reset" id="resetBtn" onclick="recalibrate()" style="display:none;">↻ Recalibrate</button>
 </div>
 
+<div class="settings" id="settingsPanel">
+  <div class="settings-title">⚙️ Alert Thresholds (editable before calibration)</div>
+  <div class="setting-row">
+    <span class="setting-label">🔴 Y axis (accel/brake) beep</span>
+    <input type="number" class="setting-input" id="threshY" value="3.0" step="0.1" min="0.5" max="20">
+    <span class="setting-unit">m/s²</span>
+  </div>
+  <div class="setting-row">
+    <span class="setting-label">🟡 X axis (turning) dong</span>
+    <input type="number" class="setting-input" id="threshX" value="2.5" step="0.1" min="0.5" max="20">
+    <span class="setting-unit">m/s²</span>
+  </div>
+</div>
+
+<div class="alert-bar ok" id="alertBar">✅ Comfortable</div>
+
 <div class="legend">
-  <span><div class="dot" style="background:#ff6b6b;"></div> X axis (device left/right)</span>
-  <span><div class="dot" style="background:#51cf66;"></div> Y axis (device forward/back)</span>
+  <span><div class="dot" style="background:#ff6b6b;"></div> X (turning)</span>
+  <span><div class="dot" style="background:#51cf66;"></div> Y (accel/brake)</span>
 </div>
 
 <div class="chart-container">
@@ -104,12 +145,12 @@
     <div class="info-value green" id="valY">0.00</div>
   </div>
   <div class="info-card">
-    <div class="info-label">|g| Check</div>
-    <div class="info-value sm" id="gCheck">--</div>
+    <div class="info-label">Peak X</div>
+    <div class="info-value sm" id="peakX">0.00</div>
   </div>
   <div class="info-card">
-    <div class="info-label">Gravity ĝ</div>
-    <div class="info-value sm" id="gVec">--</div>
+    <div class="info-label">Peak Y</div>
+    <div class="info-value sm" id="peakY">0.00</div>
   </div>
 </div>
 
@@ -118,7 +159,12 @@
 <div class="cal-overlay hidden" id="calOverlay">
   <div class="cal-icon">📐</div>
   <div class="cal-title">Calibrating Gravity Vector</div>
-  <div class="cal-desc">Hold your phone still in any position for 3 seconds. It does NOT need to be level.</div>
+  <div class="cal-desc">
+    Hold your phone <em>upright (portrait)</em> and keep it still for 3 seconds.<br><br>
+    ✅ Tilting is OK<br>
+    ❌ Do NOT hold it sideways (landscape)<br><br>
+    The phone's top edge should point up, not to the side.
+  </div>
   <div class="cal-bar"><div class="cal-fill" id="calFill"></div></div>
   <div class="cal-status" id="calStatus">Collecting samples...</div>
 </div>
@@ -127,9 +173,76 @@
 // ============ CONFIG ============
 const CAL_DURATION = 3000;
 const CAL_MIN_SAMPLES = 50;
-const SAMPLE_INTERVAL = 50;  // 20 fps
-const CHART_SECONDS = 10;
+const SAMPLE_INTERVAL = 50;
+const CHART_SECONDS = 15;
 const GRAV_LP = 0.97;
+
+let THRESH_Y = 3.0;
+let THRESH_X = 2.5;
+
+// ============ AUDIO ============
+let audioCtx = null;
+
+function ensureAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playBeep() {
+  ensureAudioCtx();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.type = 'sine'; osc.frequency.value = 1200; gain.gain.value = 0.3;
+  const now = audioCtx.currentTime;
+  osc.start(now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12); osc.stop(now + 0.12);
+}
+
+function playDong() {
+  ensureAudioCtx();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.type = 'sine'; osc.frequency.value = 400; gain.gain.value = 0.35;
+  const now = audioCtx.currentTime;
+  osc.start(now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2); osc.stop(now + 0.2);
+}
+
+let alertState = 'ok';
+let soundTimer = null;
+let bothToggle = false;
+
+function startAlertLoop() {
+  if (soundTimer) return;
+  soundTimer = setInterval(() => {
+    if (alertState === 'y') playBeep();
+    else if (alertState === 'x') playDong();
+    else if (alertState === 'both') { if (bothToggle) playBeep(); else playDong(); bothToggle = !bothToggle; }
+  }, 300);
+}
+
+function stopAlertLoop() { if (soundTimer) { clearInterval(soundTimer); soundTimer = null; } }
+
+function updateAlert() {
+  const overY = Math.abs(accelHY) > THRESH_Y;
+  const overX = Math.abs(accelHX) > THRESH_X;
+  const bar = document.getElementById('alertBar');
+
+  if (overX && overY) {
+    if (alertState !== 'both') { alertState = 'both'; bothToggle = false; }
+    bar.className = 'alert-bar warn-both';
+    bar.textContent = '⚠️ X & Y OVER THRESHOLD!';
+  } else if (overY) {
+    alertState = 'y'; bar.className = 'alert-bar warn-y';
+    bar.textContent = '⚠️ Y (Accel/Brake) Over ' + THRESH_Y.toFixed(1);
+  } else if (overX) {
+    alertState = 'x'; bar.className = 'alert-bar warn-x';
+    bar.textContent = '⚠️ X (Turning) Over ' + THRESH_X.toFixed(1);
+  } else {
+    alertState = 'ok'; bar.className = 'alert-bar ok';
+    bar.textContent = '✅ Comfortable';
+  }
+}
 
 // ============ STATE ============
 let permissionGranted = false;
@@ -139,28 +252,20 @@ let calibrating = false;
 let calStartTime = 0;
 let calAccelSamples = [];
 
-// Gravity unit vector in device frame
 let gUnitX = 0, gUnitY = 0, gUnitZ = 1;
+let basisAx = 0, basisAy = 0, basisAz = 0;
+let basisBx = 0, basisBy = 0, basisBz = 0;
 
-// Two orthonormal basis vectors spanning the horizontal plane (⊥ to gravity)
-// These define the X and Y axes for our acceleration output
-let basisAx = 0, basisAy = 0, basisAz = 0; // "X" direction in device frame
-let basisBx = 0, basisBy = 0, basisBz = 0; // "Y" direction in device frame
-
-// Continuous gravity LP
 let gravX = 0, gravY = 0, gravZ = 9.8;
 let gravInited = false;
 
-// Current horizontal accelerations
 let accelHX = 0, accelHY = 0;
+let peakX = 0, peakY = 0;
 
-// Chart data
-let dataX = [];
-let dataY = [];
+let dataX = [], dataY = [];
 let chartStartTime = 0;
 let sampleTimer = null;
 
-// Canvas
 const canvas = document.getElementById('chart');
 const ctx = canvas.getContext('2d');
 const dpr = window.devicePixelRatio || 1;
@@ -190,10 +295,6 @@ function handleMotion(e) {
     gravZ = GRAV_LP * gravZ + (1 - GRAV_LP) * agz;
   }
 
-  const gMag = Math.sqrt(gravX*gravX + gravY*gravY + gravZ*gravZ);
-  document.getElementById('gCheck').textContent = gMag.toFixed(2);
-
-  // Calibration
   if (calibrating) {
     calAccelSamples.push({ x: agx, y: agy, z: agz });
     const progress = Math.min((now - calStartTime) / CAL_DURATION * 100, 100);
@@ -205,17 +306,23 @@ function handleMotion(e) {
 
   if (!calibrated) return;
 
-  // Use e.acceleration (gravity removed by OS) for motion acceleration
   const ax = e.acceleration?.x || 0;
   const ay = e.acceleration?.y || 0;
   const az = e.acceleration?.z || 0;
 
-  // Project onto horizontal basis vectors
   accelHX = ax * basisAx + ay * basisAy + az * basisAz;
   accelHY = ax * basisBx + ay * basisBy + az * basisBz;
 
+  const absX = Math.abs(accelHX), absY = Math.abs(accelHY);
+  if (absX > peakX) peakX = absX;
+  if (absY > peakY) peakY = absY;
+
   document.getElementById('valX').textContent = accelHX.toFixed(2);
   document.getElementById('valY').textContent = accelHY.toFixed(2);
+  document.getElementById('peakX').textContent = peakX.toFixed(2);
+  document.getElementById('peakY').textContent = peakY.toFixed(2);
+
+  updateAlert();
 }
 
 // ============ CHART ============
@@ -231,10 +338,12 @@ function startSampling() {
     if (dataY.length > maxSamples) dataY.shift();
     drawChart();
   }, SAMPLE_INTERVAL);
+  startAlertLoop();
 }
 
 function stopSampling() {
   if (sampleTimer) { clearInterval(sampleTimer); sampleTimer = null; }
+  stopAlertLoop();
 }
 
 function drawChart() {
@@ -245,8 +354,7 @@ function drawChart() {
 
   ctx.clearRect(0, 0, w, h);
 
-  // Auto Y range
-  let maxAbs = 2;
+  let maxAbs = Math.max(THRESH_X, THRESH_Y, 2);
   for (const d of dataX) { const a = Math.abs(d.v); if (a > maxAbs) maxAbs = a; }
   for (const d of dataY) { const a = Math.abs(d.v); if (a > maxAbs) maxAbs = a; }
   const yRange = Math.max(1, Math.ceil(maxAbs) + 1);
@@ -257,9 +365,30 @@ function drawChart() {
   function xPos(t) { return pad.left + ((t - tMin) / (tMax - tMin)) * cw; }
   function yPos(v) { return pad.top + ch / 2 - (v / yRange) * (ch / 2); }
 
-  // Background
   ctx.fillStyle = '#0a0a18';
   ctx.fillRect(pad.left, pad.top, cw, ch);
+
+  // Threshold bands & lines
+  const yThreshTop = yPos(THRESH_Y), yThreshBot = yPos(-THRESH_Y);
+  ctx.fillStyle = 'rgba(255,107,107,0.04)';
+  ctx.fillRect(pad.left, pad.top, cw, yThreshTop - pad.top);
+  ctx.fillRect(pad.left, yThreshBot, cw, pad.top + ch - yThreshBot);
+
+  ctx.strokeStyle = 'rgba(255,107,107,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([6, 4]);
+  ctx.beginPath(); ctx.moveTo(pad.left, yThreshTop); ctx.lineTo(pad.left + cw, yThreshTop); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad.left, yThreshBot); ctx.lineTo(pad.left + cw, yThreshBot); ctx.stroke();
+
+  const xThreshTop = yPos(THRESH_X), xThreshBot = yPos(-THRESH_X);
+  ctx.strokeStyle = 'rgba(252,196,25,0.25)';
+  ctx.beginPath(); ctx.moveTo(pad.left, xThreshTop); ctx.lineTo(pad.left + cw, xThreshTop); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad.left, xThreshBot); ctx.lineTo(pad.left + cw, xThreshBot); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.font = '8px -apple-system,sans-serif';
+  ctx.fillStyle = 'rgba(255,107,107,0.4)'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+  ctx.fillText('Y ±' + THRESH_Y.toFixed(1), pad.left + cw - 4, yThreshTop - 2);
+  ctx.fillStyle = 'rgba(252,196,25,0.4)'; ctx.textBaseline = 'top';
+  ctx.fillText('X ±' + THRESH_X.toFixed(1), pad.left + cw - 4, xThreshTop + 2);
 
   // H grid
   ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
@@ -299,7 +428,6 @@ function drawChart() {
     ctx.fillText(t.toFixed(0) + 's', x, pad.top + ch + 4);
   }
 
-  // Axis titles
   ctx.fillStyle = '#444'; ctx.font = '8px -apple-system,sans-serif'; ctx.textAlign = 'center';
   ctx.fillText('Time (s)', pad.left + cw / 2, h - 2);
   ctx.save(); ctx.translate(8, pad.top + ch / 2); ctx.rotate(-Math.PI / 2);
@@ -308,13 +436,9 @@ function drawChart() {
   // Clip
   ctx.save(); ctx.beginPath(); ctx.rect(pad.left, pad.top, cw, ch); ctx.clip();
 
-  // Draw helper function
   function drawLine(data, color) {
     if (data.length < 2) return;
-
-    // Fill
-    ctx.beginPath();
-    let started = false;
+    ctx.beginPath(); let started = false;
     for (const d of data) {
       if (d.t < tMin) continue;
       const x = xPos(d.t), y = yPos(d.v);
@@ -323,39 +447,35 @@ function drawChart() {
     }
     if (started) {
       ctx.lineTo(xPos(data[data.length - 1].t), zeroY); ctx.closePath();
-      ctx.fillStyle = color.replace('1)', '0.06)');
-      ctx.fill();
+      ctx.fillStyle = color.replace('1)', '0.06)'); ctx.fill();
     }
-
-    // Line
     ctx.beginPath(); started = false;
     for (const d of data) {
       if (d.t < tMin) continue;
       const x = xPos(d.t), y = yPos(d.v);
       if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
     }
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
-
-    // End dot
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
     const last = data[data.length - 1];
     const lx = xPos(last.t), ly = yPos(last.v);
-    ctx.fillStyle = color;
-    ctx.beginPath(); ctx.arc(lx, ly, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(lx, ly, 3.5, 0, Math.PI * 2); ctx.fill();
   }
 
   drawLine(dataX, 'rgba(255,107,107,1)');
   drawLine(dataY, 'rgba(81,207,102,1)');
 
   ctx.restore();
-
-  // Border
   ctx.strokeStyle = '#1e1e40'; ctx.lineWidth = 1;
   ctx.strokeRect(pad.left, pad.top, cw, ch);
 }
 
 // ============ CALIBRATION ============
 function startCalibration() {
+  THRESH_Y = parseFloat(document.getElementById('threshY').value) || 3.0;
+  THRESH_X = parseFloat(document.getElementById('threshX').value) || 2.5;
+  document.getElementById('threshY').disabled = true;
+  document.getElementById('threshX').disabled = true;
+
   calibrating = true;
   calStartTime = performance.now();
   calAccelSamples = [];
@@ -369,6 +489,8 @@ function finishCalibration() {
 
   if (calAccelSamples.length < CAL_MIN_SAMPLES) {
     document.getElementById('status').textContent = '❌ Not enough samples. Try again.';
+    document.getElementById('threshY').disabled = false;
+    document.getElementById('threshX').disabled = false;
     return;
   }
 
@@ -380,63 +502,60 @@ function finishCalibration() {
 
   if (mag < 5) {
     document.getElementById('status').textContent = '❌ Gravity too weak. Try again.';
+    document.getElementById('threshY').disabled = false;
+    document.getElementById('threshX').disabled = false;
     return;
   }
 
-  // Gravity unit vector
-  gUnitX = avgX / mag;
-  gUnitY = avgY / mag;
-  gUnitZ = avgZ / mag;
+  gUnitX = avgX / mag; gUnitY = avgY / mag; gUnitZ = avgZ / mag;
   gravX = avgX; gravY = avgY; gravZ = avgZ;
 
-  // Build two orthonormal basis vectors in the horizontal plane (⊥ to gravity)
-  // Basis A: project device X axis (1,0,0) onto horizontal plane
-  let ax = 1 - gUnitX * gUnitX;
-  let ay = 0 - gUnitX * gUnitY;
-  let az = 0 - gUnitX * gUnitZ;
+  // Build horizontal basis vectors
+  // Basis A (X axis): device X projected onto horizontal plane
+  let ax = 1 - gUnitX*gUnitX, ay = -gUnitX*gUnitY, az = -gUnitX*gUnitZ;
   let alen = Math.sqrt(ax*ax + ay*ay + az*az);
-
   if (alen < 0.01) {
-    // Gravity is along device X, use device Y instead
-    ax = 0 - gUnitY * gUnitX;
-    ay = 1 - gUnitY * gUnitY;
-    az = 0 - gUnitY * gUnitZ;
+    ax = -gUnitY*gUnitX; ay = 1 - gUnitY*gUnitY; az = -gUnitY*gUnitZ;
     alen = Math.sqrt(ax*ax + ay*ay + az*az);
   }
+  basisAx = ax/alen; basisAy = ay/alen; basisAz = az/alen;
 
-  basisAx = ax / alen;
-  basisAy = ay / alen;
-  basisAz = az / alen;
-
-  // Basis B: cross product of gravity × basisA
-  basisBx = gUnitY * basisAz - gUnitZ * basisAy;
-  basisBy = gUnitZ * basisAx - gUnitX * basisAz;
-  basisBz = gUnitX * basisAy - gUnitY * basisAx;
+  // Basis B (Y axis): gravity × basisA
+  basisBx = gUnitY*basisAz - gUnitZ*basisAy;
+  basisBy = gUnitZ*basisAx - gUnitX*basisAz;
+  basisBz = gUnitX*basisAy - gUnitY*basisAx;
   const blen = Math.sqrt(basisBx*basisBx + basisBy*basisBy + basisBz*basisBz);
   basisBx /= blen; basisBy /= blen; basisBz /= blen;
 
-  document.getElementById('gVec').textContent =
-    `(${gUnitX.toFixed(2)}, ${gUnitY.toFixed(2)}, ${gUnitZ.toFixed(2)})`;
-
-  accelHX = 0; accelHY = 0;
+  accelHX = 0; accelHY = 0; peakX = 0; peakY = 0;
   calibrated = true;
   document.getElementById('resetBtn').style.display = '';
-  document.getElementById('status').textContent = '✅ Calibrated! Move your phone in the horizontal plane.';
+  document.getElementById('status').textContent =
+    `✅ Calibrated! Thresholds: Y=${THRESH_Y.toFixed(1)}, X=${THRESH_X.toFixed(1)} m/s²`;
 
+  ensureAudioCtx();
   startSampling();
 }
 
 function recalibrate() {
   stopSampling(); calibrated = false;
-  accelHX = 0; accelHY = 0;
+  accelHX = 0; accelHY = 0; peakX = 0; peakY = 0;
   dataX = []; dataY = [];
+  alertState = 'ok';
+  document.getElementById('alertBar').className = 'alert-bar ok';
+  document.getElementById('alertBar').textContent = '✅ Comfortable';
   document.getElementById('valX').textContent = '0.00';
   document.getElementById('valY').textContent = '0.00';
+  document.getElementById('peakX').textContent = '0.00';
+  document.getElementById('peakY').textContent = '0.00';
+  document.getElementById('threshY').disabled = false;
+  document.getElementById('threshX').disabled = false;
   drawChart(); startCalibration();
 }
 
 // ============ PERMISSION ============
 function requestPermission() {
+  ensureAudioCtx();
   if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
     DeviceMotionEvent.requestPermission()
       .then(state => {
