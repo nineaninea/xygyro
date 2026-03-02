@@ -23,6 +23,7 @@
   .btn:active { transform: scale(0.96); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-perm { background: linear-gradient(135deg, #4a90d9, #357abd); }
+  .btn-stop { background: linear-gradient(135deg, #ff6b6b, #e03131); }
   .btn-reset { background: linear-gradient(135deg, #868e96, #495057); }
 
   .settings {
@@ -30,9 +31,7 @@
     padding: 14px; border: 1px solid #1e1e40; margin-bottom: 14px;
   }
   .settings-title { font-size: 0.7rem; color: #7eb8ff; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
-  .setting-row {
-    display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
-  }
+  .setting-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
   .setting-row:last-child { margin-bottom: 0; }
   .setting-label { font-size: 0.82rem; color: #aaa; flex: 1; }
   .setting-input {
@@ -42,6 +41,22 @@
   }
   .setting-input:disabled { opacity: 0.4; }
   .setting-unit { font-size: 0.75rem; color: #666; margin-left: 6px; min-width: 40px; }
+
+  /* Score display */
+  .score-container {
+    width: 100%; max-width: 460px; display: flex; align-items: center;
+    gap: 14px; margin-bottom: 14px;
+  }
+  .score-circle {
+    width: 80px; height: 80px; border-radius: 50%; display: flex;
+    flex-direction: column; align-items: center; justify-content: center;
+    border: 3px solid; flex-shrink: 0; transition: border-color 0.3s;
+  }
+  .score-number { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .score-label { font-size: 0.55rem; color: #888; text-transform: uppercase; margin-top: 2px; }
+  .score-detail { flex: 1; }
+  .score-grade { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+  .score-breakdown { font-size: 0.7rem; color: #777; line-height: 1.5; }
 
   .alert-bar {
     width: 100%; max-width: 460px; height: 36px; border-radius: 10px;
@@ -85,6 +100,28 @@
 
   #status { font-size: 0.78rem; color: #888; text-align: center; margin-top: 4px; max-width: 460px; line-height: 1.4; }
 
+  /* Final report overlay */
+  .report-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.92); display: flex; flex-direction: column;
+    justify-content: center; align-items: center; z-index: 100; padding: 24px;
+  }
+  .report-overlay.hidden { display: none; }
+  .report-card {
+    width: 100%; max-width: 360px; background: #12122a; border-radius: 20px;
+    padding: 24px; border: 1px solid #1e1e40; text-align: center;
+  }
+  .report-title { font-size: 1.1rem; color: #7eb8ff; margin-bottom: 16px; font-weight: 700; }
+  .report-score { font-size: 3.5rem; font-weight: 900; line-height: 1; margin-bottom: 4px; }
+  .report-grade { font-size: 1.2rem; font-weight: 700; margin-bottom: 16px; }
+  .report-stats { text-align: left; font-size: 0.8rem; color: #888; line-height: 1.8; }
+  .report-stats .stat-val { color: #ccc; font-weight: 600; }
+  .report-close {
+    margin-top: 20px; border: none; padding: 12px 32px; border-radius: 12px;
+    background: linear-gradient(135deg, #4a90d9, #357abd);
+    color: white; font-size: 1rem; font-weight: 600; cursor: pointer;
+  }
+
   .cal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0,0,0,0.92); display: flex; flex-direction: column;
@@ -103,24 +140,37 @@
 <body>
 
 <h1>🚗 Driving Comfort Monitor</h1>
-<div class="subtitle">X &amp; Y acceleration with audio alerts</div>
+<div class="subtitle">Real-time comfort scoring with audio alerts</div>
 
 <div class="controls">
   <button class="btn btn-perm" id="permBtn" onclick="requestPermission()">Grant Sensors</button>
-  <button class="btn btn-reset" id="resetBtn" onclick="recalibrate()" style="display:none;">↻ Recalibrate</button>
+  <button class="btn btn-stop" id="stopBtn" onclick="stopSession()" style="display:none;">⏹ Stop</button>
+  <button class="btn btn-reset" id="resetBtn" onclick="recalibrate()" style="display:none;">↻ Restart</button>
 </div>
 
 <div class="settings" id="settingsPanel">
   <div class="settings-title">⚙️ Alert Thresholds (editable before calibration)</div>
   <div class="setting-row">
-    <span class="setting-label">🔴 Y axis (accel/brake) beep</span>
+    <span class="setting-label">🔴 Y (accel/brake) beep</span>
     <input type="number" class="setting-input" id="threshY" value="3.0" step="0.1" min="0.5" max="20">
     <span class="setting-unit">m/s²</span>
   </div>
   <div class="setting-row">
-    <span class="setting-label">🟡 X axis (turning) dong</span>
+    <span class="setting-label">🟡 X (turning) dong</span>
     <input type="number" class="setting-input" id="threshX" value="2.5" step="0.1" min="0.5" max="20">
     <span class="setting-unit">m/s²</span>
+  </div>
+</div>
+
+<!-- Score -->
+<div class="score-container" id="scoreContainer" style="display:none;">
+  <div class="score-circle" id="scoreCircle">
+    <div class="score-number" id="scoreNumber">100</div>
+    <div class="score-label">Score</div>
+  </div>
+  <div class="score-detail">
+    <div class="score-grade" id="scoreGrade">🌟 Excellent</div>
+    <div class="score-breakdown" id="scoreBreakdown">Waiting for data...</div>
   </div>
 </div>
 
@@ -156,6 +206,7 @@
 
 <div id="status">Tap "Grant Sensors" to begin</div>
 
+<!-- Calibration overlay -->
 <div class="cal-overlay hidden" id="calOverlay">
   <div class="cal-icon">📐</div>
   <div class="cal-title">Calibrating Gravity Vector</div>
@@ -169,6 +220,17 @@
   <div class="cal-status" id="calStatus">Collecting samples...</div>
 </div>
 
+<!-- Final report overlay -->
+<div class="report-overlay hidden" id="reportOverlay">
+  <div class="report-card">
+    <div class="report-title">🏁 Trip Report</div>
+    <div class="report-score" id="reportScore">--</div>
+    <div class="report-grade" id="reportGrade">--</div>
+    <div class="report-stats" id="reportStats"></div>
+    <button class="report-close" onclick="closeReport()">OK</button>
+  </div>
+</div>
+
 <script>
 // ============ CONFIG ============
 const CAL_DURATION = 3000;
@@ -176,36 +238,32 @@ const CAL_MIN_SAMPLES = 50;
 const SAMPLE_INTERVAL = 50;
 const CHART_SECONDS = 15;
 const GRAV_LP = 0.97;
+const SCORE_UPDATE_MS = 500;
 
 let THRESH_Y = 3.0;
 let THRESH_X = 2.5;
 
 // ============ AUDIO ============
 let audioCtx = null;
-
 function ensureAudioCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === 'suspended') audioCtx.resume();
 }
-
 function playBeep() {
   ensureAudioCtx();
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.connect(gain); gain.connect(audioCtx.destination);
-  osc.type = 'sine'; osc.frequency.value = 1200; gain.gain.value = 0.3;
-  const now = audioCtx.currentTime;
-  osc.start(now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06); osc.stop(now + 0.06);
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.connect(g); g.connect(audioCtx.destination);
+  o.type = 'sine'; o.frequency.value = 1200; g.gain.value = 0.3;
+  const t = audioCtx.currentTime;
+  o.start(t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.06); o.stop(t + 0.06);
 }
-
 function playDong() {
   ensureAudioCtx();
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.connect(gain); gain.connect(audioCtx.destination);
-  osc.type = 'sine'; osc.frequency.value = 400; gain.gain.value = 0.35;
-  const now = audioCtx.currentTime;
-  osc.start(now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08); osc.stop(now + 0.08);
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.connect(g); g.connect(audioCtx.destination);
+  o.type = 'sine'; o.frequency.value = 400; g.gain.value = 0.35;
+  const t = audioCtx.currentTime;
+  o.start(t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08); o.stop(t + 0.08);
 }
 
 let alertState = 'ok';
@@ -220,18 +278,15 @@ function startAlertLoop() {
     else if (alertState === 'both') { if (bothToggle) playBeep(); else playDong(); bothToggle = !bothToggle; }
   }, 125);
 }
-
 function stopAlertLoop() { if (soundTimer) { clearInterval(soundTimer); soundTimer = null; } }
 
 function updateAlert() {
   const overY = Math.abs(accelHY) > THRESH_Y;
   const overX = Math.abs(accelHX) > THRESH_X;
   const bar = document.getElementById('alertBar');
-
   if (overX && overY) {
     if (alertState !== 'both') { alertState = 'both'; bothToggle = false; }
-    bar.className = 'alert-bar warn-both';
-    bar.textContent = '⚠️ X & Y OVER THRESHOLD!';
+    bar.className = 'alert-bar warn-both'; bar.textContent = '⚠️ X & Y OVER THRESHOLD!';
   } else if (overY) {
     alertState = 'y'; bar.className = 'alert-bar warn-y';
     bar.textContent = '⚠️ Y (Accel/Brake) Over ' + THRESH_Y.toFixed(1);
@@ -239,15 +294,104 @@ function updateAlert() {
     alertState = 'x'; bar.className = 'alert-bar warn-x';
     bar.textContent = '⚠️ X (Turning) Over ' + THRESH_X.toFixed(1);
   } else {
-    alertState = 'ok'; bar.className = 'alert-bar ok';
-    bar.textContent = '✅ Comfortable';
+    alertState = 'ok'; bar.className = 'alert-bar ok'; bar.textContent = '✅ Comfortable';
   }
+}
+
+// ============ SCORING ============
+// Score = 100 - penalty
+// Penalties:
+//   1. RMS penalty: rms of combined accel / threshold, scaled (0-30 pts)
+//   2. Over-threshold time ratio (0-40 pts)
+//   3. Peak penalty: how far peaks exceeded thresholds (0-30 pts)
+
+let scoreSamples = []; // { ax, ay } all samples for final scoring
+let scoreTimer = null;
+
+function calcScore() {
+  if (scoreSamples.length < 10) return { score: 100, grade: '🌟 Excellent', rms: 0, overPct: 0, peakPenalty: 0 };
+
+  // RMS of normalized acceleration
+  let sumSq = 0;
+  let overCount = 0;
+  let maxOverX = 0, maxOverY = 0;
+
+  for (const s of scoreSamples) {
+    const nx = s.ax / THRESH_X;
+    const ny = s.ay / THRESH_Y;
+    sumSq += nx * nx + ny * ny;
+
+    if (Math.abs(s.ax) > THRESH_X || Math.abs(s.ay) > THRESH_Y) overCount++;
+
+    const ox = Math.max(0, Math.abs(s.ax) - THRESH_X);
+    const oy = Math.max(0, Math.abs(s.ay) - THRESH_Y);
+    if (ox > maxOverX) maxOverX = ox;
+    if (oy > maxOverY) maxOverY = oy;
+  }
+
+  const rms = Math.sqrt(sumSq / scoreSamples.length);
+  const overPct = overCount / scoreSamples.length;
+
+  // Penalties
+  // RMS penalty: rms of 0.5 is very smooth, 1.0 = at threshold, >1.5 = rough
+  const rmsPenalty = Math.min(30, rms * 20);
+
+  // Over-threshold time penalty: 0% = 0pts, 5% = 10pts, 20% = 40pts
+  const overPenalty = Math.min(40, overPct * 200);
+
+  // Peak penalty: how much over threshold
+  const peakOver = (maxOverX / THRESH_X + maxOverY / THRESH_Y) / 2;
+  const peakPenalty = Math.min(30, peakOver * 15);
+
+  const score = Math.max(0, Math.min(100, Math.round(100 - rmsPenalty - overPenalty - peakPenalty)));
+
+  let grade;
+  if (score >= 90) grade = '🌟 Excellent';
+  else if (score >= 75) grade = '👍 Good';
+  else if (score >= 60) grade = '😐 Fair';
+  else if (score >= 40) grade = '😬 Rough';
+  else grade = '🤢 Very Rough';
+
+  return { score, grade, rms, overPct, peakPenalty, rmsPenalty, overPenalty };
+}
+
+function getScoreColor(score) {
+  if (score >= 90) return '#51cf66';
+  if (score >= 75) return '#7eb8ff';
+  if (score >= 60) return '#fcc419';
+  if (score >= 40) return '#ff922b';
+  return '#ff6b6b';
+}
+
+function updateScoreDisplay() {
+  const result = calcScore();
+  const color = getScoreColor(result.score);
+
+  document.getElementById('scoreNumber').textContent = result.score;
+  document.getElementById('scoreNumber').style.color = color;
+  document.getElementById('scoreCircle').style.borderColor = color;
+  document.getElementById('scoreGrade').textContent = result.grade;
+  document.getElementById('scoreGrade').style.color = color;
+
+  const overPctStr = (result.overPct * 100).toFixed(1);
+  document.getElementById('scoreBreakdown').textContent =
+    `RMS: ${result.rms.toFixed(2)} | Over threshold: ${overPctStr}% | Samples: ${scoreSamples.length}`;
+}
+
+function startScoreUpdates() {
+  document.getElementById('scoreContainer').style.display = 'flex';
+  scoreTimer = setInterval(updateScoreDisplay, SCORE_UPDATE_MS);
+}
+
+function stopScoreUpdates() {
+  if (scoreTimer) { clearInterval(scoreTimer); scoreTimer = null; }
 }
 
 // ============ STATE ============
 let permissionGranted = false;
 let calibrated = false;
 let calibrating = false;
+let running = false;
 
 let calStartTime = 0;
 let calAccelSamples = [];
@@ -265,6 +409,7 @@ let peakX = 0, peakY = 0;
 let dataX = [], dataY = [];
 let chartStartTime = 0;
 let sampleTimer = null;
+let sessionStartTime = 0;
 
 const canvas = document.getElementById('chart');
 const ctx = canvas.getContext('2d');
@@ -272,24 +417,20 @@ const dpr = window.devicePixelRatio || 1;
 
 function resizeCanvas() {
   const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  drawChart();
+  canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawChart();
 }
 window.addEventListener('resize', resizeCanvas);
 
 // ============ SENSOR ============
 function handleMotion(e) {
   const now = performance.now();
-
   const agx = e.accelerationIncludingGravity?.x || 0;
   const agy = e.accelerationIncludingGravity?.y || 0;
   const agz = e.accelerationIncludingGravity?.z || 0;
 
-  if (!gravInited) {
-    gravX = agx; gravY = agy; gravZ = agz; gravInited = true;
-  } else {
+  if (!gravInited) { gravX = agx; gravY = agy; gravZ = agz; gravInited = true; }
+  else {
     gravX = GRAV_LP * gravX + (1 - GRAV_LP) * agx;
     gravY = GRAV_LP * gravY + (1 - GRAV_LP) * agy;
     gravZ = GRAV_LP * gravZ + (1 - GRAV_LP) * agz;
@@ -304,7 +445,7 @@ function handleMotion(e) {
     return;
   }
 
-  if (!calibrated) return;
+  if (!calibrated || !running) return;
 
   const ax = e.acceleration?.x || 0;
   const ay = e.acceleration?.y || 0;
@@ -316,6 +457,9 @@ function handleMotion(e) {
   const absX = Math.abs(accelHX), absY = Math.abs(accelHY);
   if (absX > peakX) peakX = absX;
   if (absY > peakY) peakY = absY;
+
+  // Collect for scoring
+  scoreSamples.push({ ax: accelHX, ay: accelHY });
 
   document.getElementById('valX').textContent = accelHX.toFixed(2);
   document.getElementById('valY').textContent = accelHY.toFixed(2);
@@ -331,142 +475,160 @@ function startSampling() {
   dataX = []; dataY = [];
   sampleTimer = setInterval(() => {
     const t = (performance.now() - chartStartTime) / 1000;
-    dataX.push({ t, v: accelHX });
-    dataY.push({ t, v: accelHY });
+    dataX.push({ t, v: accelHX }); dataY.push({ t, v: accelHY });
     const maxSamples = Math.ceil(CHART_SECONDS / (SAMPLE_INTERVAL / 1000)) + 20;
     if (dataX.length > maxSamples) dataX.shift();
     if (dataY.length > maxSamples) dataY.shift();
     drawChart();
   }, SAMPLE_INTERVAL);
   startAlertLoop();
+  startScoreUpdates();
 }
 
 function stopSampling() {
   if (sampleTimer) { clearInterval(sampleTimer); sampleTimer = null; }
-  stopAlertLoop();
+  stopAlertLoop(); stopScoreUpdates();
 }
 
 function drawChart() {
   const w = canvas.width / dpr, h = canvas.height / dpr;
   const pad = { top: 16, right: 12, bottom: 28, left: 44 };
-  const cw = w - pad.left - pad.right;
-  const ch = h - pad.top - pad.bottom;
+  const cw = w - pad.left - pad.right, ch = h - pad.top - pad.bottom;
 
   ctx.clearRect(0, 0, w, h);
 
   let maxAbs = Math.max(THRESH_X, THRESH_Y, 2);
-  for (const d of dataX) { const a = Math.abs(d.v); if (a > maxAbs) maxAbs = a; }
-  for (const d of dataY) { const a = Math.abs(d.v); if (a > maxAbs) maxAbs = a; }
+  for (const d of dataX) { if (Math.abs(d.v) > maxAbs) maxAbs = Math.abs(d.v); }
+  for (const d of dataY) { if (Math.abs(d.v) > maxAbs) maxAbs = Math.abs(d.v); }
   const yRange = Math.max(1, Math.ceil(maxAbs) + 1);
 
   const now = dataX.length > 0 ? dataX[dataX.length - 1].t : 0;
   const tMin = now - CHART_SECONDS, tMax = now;
 
-  function xPos(t) { return pad.left + ((t - tMin) / (tMax - tMin)) * cw; }
-  function yPos(v) { return pad.top + ch / 2 - (v / yRange) * (ch / 2); }
+  function xP(t) { return pad.left + ((t - tMin) / (tMax - tMin)) * cw; }
+  function yP(v) { return pad.top + ch / 2 - (v / yRange) * (ch / 2); }
 
-  ctx.fillStyle = '#0a0a18';
-  ctx.fillRect(pad.left, pad.top, cw, ch);
+  ctx.fillStyle = '#0a0a18'; ctx.fillRect(pad.left, pad.top, cw, ch);
 
-  // Threshold bands & lines
-  const yThreshTop = yPos(THRESH_Y), yThreshBot = yPos(-THRESH_Y);
+  // Threshold bands
+  const yTT = yP(THRESH_Y), yTB = yP(-THRESH_Y);
   ctx.fillStyle = 'rgba(255,107,107,0.04)';
-  ctx.fillRect(pad.left, pad.top, cw, yThreshTop - pad.top);
-  ctx.fillRect(pad.left, yThreshBot, cw, pad.top + ch - yThreshBot);
+  ctx.fillRect(pad.left, pad.top, cw, yTT - pad.top);
+  ctx.fillRect(pad.left, yTB, cw, pad.top + ch - yTB);
 
   ctx.strokeStyle = 'rgba(255,107,107,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([6, 4]);
-  ctx.beginPath(); ctx.moveTo(pad.left, yThreshTop); ctx.lineTo(pad.left + cw, yThreshTop); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(pad.left, yThreshBot); ctx.lineTo(pad.left + cw, yThreshBot); ctx.stroke();
-
-  const xThreshTop = yPos(THRESH_X), xThreshBot = yPos(-THRESH_X);
+  ctx.beginPath(); ctx.moveTo(pad.left, yTT); ctx.lineTo(pad.left + cw, yTT); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad.left, yTB); ctx.lineTo(pad.left + cw, yTB); ctx.stroke();
+  const xTT = yP(THRESH_X), xTB = yP(-THRESH_X);
   ctx.strokeStyle = 'rgba(252,196,25,0.25)';
-  ctx.beginPath(); ctx.moveTo(pad.left, xThreshTop); ctx.lineTo(pad.left + cw, xThreshTop); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(pad.left, xThreshBot); ctx.lineTo(pad.left + cw, xThreshBot); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad.left, xTT); ctx.lineTo(pad.left + cw, xTT); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad.left, xTB); ctx.lineTo(pad.left + cw, xTB); ctx.stroke();
   ctx.setLineDash([]);
 
   ctx.font = '8px -apple-system,sans-serif';
   ctx.fillStyle = 'rgba(255,107,107,0.4)'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-  ctx.fillText('Y ±' + THRESH_Y.toFixed(1), pad.left + cw - 4, yThreshTop - 2);
+  ctx.fillText('Y ±' + THRESH_Y.toFixed(1), pad.left + cw - 4, yTT - 2);
   ctx.fillStyle = 'rgba(252,196,25,0.4)'; ctx.textBaseline = 'top';
-  ctx.fillText('X ±' + THRESH_X.toFixed(1), pad.left + cw - 4, xThreshTop + 2);
+  ctx.fillText('X ±' + THRESH_X.toFixed(1), pad.left + cw - 4, xTT + 2);
 
-  // H grid
+  // Grid
   ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
   const yStep = yRange <= 3 ? 1 : yRange <= 10 ? 2 : yRange <= 30 ? 5 : 10;
   for (let a = -yRange; a <= yRange; a += yStep) {
-    const y = yPos(a); if (y < pad.top || y > pad.top + ch) continue;
+    const y = yP(a); if (y < pad.top || y > pad.top + ch) continue;
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
   }
-
-  // Zero line
   ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
-  const zeroY = yPos(0);
+  const zeroY = yP(0);
   ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(pad.left + cw, zeroY); ctx.stroke();
   ctx.setLineDash([]);
 
-  // V grid
   ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
   const tStep = CHART_SECONDS <= 5 ? 1 : CHART_SECONDS <= 15 ? 2 : 5;
   const firstT = Math.ceil(tMin / tStep) * tStep;
   for (let t = firstT; t <= tMax; t += tStep) {
-    const x = xPos(t); if (x < pad.left || x > pad.left + cw) continue;
+    const x = xP(t); if (x < pad.left || x > pad.left + cw) continue;
     ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + ch); ctx.stroke();
   }
 
-  // Y labels
   ctx.fillStyle = '#555'; ctx.font = '9px -apple-system,sans-serif';
   ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
   for (let a = -yRange; a <= yRange; a += yStep) {
-    const y = yPos(a); if (y < pad.top + 5 || y > pad.top + ch - 5) continue;
+    const y = yP(a); if (y < pad.top + 5 || y > pad.top + ch - 5) continue;
     ctx.fillText(a.toFixed(0), pad.left - 5, y);
   }
-
-  // X labels
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   for (let t = firstT; t <= tMax; t += tStep) {
-    const x = xPos(t); if (x < pad.left + 10 || x > pad.left + cw - 10) continue;
+    const x = xP(t); if (x < pad.left + 10 || x > pad.left + cw - 10) continue;
     ctx.fillText(t.toFixed(0) + 's', x, pad.top + ch + 4);
   }
-
   ctx.fillStyle = '#444'; ctx.font = '8px -apple-system,sans-serif'; ctx.textAlign = 'center';
   ctx.fillText('Time (s)', pad.left + cw / 2, h - 2);
   ctx.save(); ctx.translate(8, pad.top + ch / 2); ctx.rotate(-Math.PI / 2);
   ctx.fillText('m/s²', 0, 0); ctx.restore();
 
-  // Clip
   ctx.save(); ctx.beginPath(); ctx.rect(pad.left, pad.top, cw, ch); ctx.clip();
 
   function drawLine(data, color) {
     if (data.length < 2) return;
-    ctx.beginPath(); let started = false;
-    for (const d of data) {
-      if (d.t < tMin) continue;
-      const x = xPos(d.t), y = yPos(d.v);
-      if (!started) { ctx.moveTo(x, zeroY); ctx.lineTo(x, y); started = true; }
-      else ctx.lineTo(x, y);
-    }
-    if (started) {
-      ctx.lineTo(xPos(data[data.length - 1].t), zeroY); ctx.closePath();
-      ctx.fillStyle = color.replace('1)', '0.06)'); ctx.fill();
-    }
-    ctx.beginPath(); started = false;
-    for (const d of data) {
-      if (d.t < tMin) continue;
-      const x = xPos(d.t), y = yPos(d.v);
-      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
-    }
+    ctx.beginPath(); let s = false;
+    for (const d of data) { if (d.t < tMin) continue; const x = xP(d.t), y = yP(d.v); if (!s) { ctx.moveTo(x, zeroY); ctx.lineTo(x, y); s = true; } else ctx.lineTo(x, y); }
+    if (s) { ctx.lineTo(xP(data[data.length-1].t), zeroY); ctx.closePath(); ctx.fillStyle = color.replace('1)','0.06)'); ctx.fill(); }
+    ctx.beginPath(); s = false;
+    for (const d of data) { if (d.t < tMin) continue; const x = xP(d.t), y = yP(d.v); if (!s) { ctx.moveTo(x, y); s = true; } else ctx.lineTo(x, y); }
     ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
-    const last = data[data.length - 1];
-    const lx = xPos(last.t), ly = yPos(last.v);
-    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(lx, ly, 3.5, 0, Math.PI * 2); ctx.fill();
+    const last = data[data.length-1]; ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(xP(last.t), yP(last.v), 3.5, 0, Math.PI*2); ctx.fill();
   }
-
   drawLine(dataX, 'rgba(255,107,107,1)');
   drawLine(dataY, 'rgba(81,207,102,1)');
-
   ctx.restore();
-  ctx.strokeStyle = '#1e1e40'; ctx.lineWidth = 1;
-  ctx.strokeRect(pad.left, pad.top, cw, ch);
+  ctx.strokeStyle = '#1e1e40'; ctx.lineWidth = 1; ctx.strokeRect(pad.left, pad.top, cw, ch);
+}
+
+// ============ SESSION ============
+function stopSession() {
+  running = false;
+  stopSampling();
+  alertState = 'ok';
+  document.getElementById('alertBar').className = 'alert-bar ok';
+  document.getElementById('alertBar').textContent = '⏹ Stopped';
+  document.getElementById('stopBtn').style.display = 'none';
+  document.getElementById('resetBtn').style.display = '';
+
+  // Final score
+  const result = calcScore();
+  updateScoreDisplay();
+  showReport(result);
+}
+
+function showReport(result) {
+  const duration = ((performance.now() - sessionStartTime) / 1000).toFixed(1);
+  const color = getScoreColor(result.score);
+
+  document.getElementById('reportScore').textContent = result.score;
+  document.getElementById('reportScore').style.color = color;
+  document.getElementById('reportGrade').textContent = result.grade;
+  document.getElementById('reportGrade').style.color = color;
+
+  const overPct = (result.overPct * 100).toFixed(1);
+  document.getElementById('reportStats').innerHTML =
+    `<div>Duration: <span class="stat-val">${duration}s</span></div>` +
+    `<div>Total samples: <span class="stat-val">${scoreSamples.length}</span></div>` +
+    `<div>Peak X (turning): <span class="stat-val">${peakX.toFixed(2)} m/s²</span></div>` +
+    `<div>Peak Y (accel/brake): <span class="stat-val">${peakY.toFixed(2)} m/s²</span></div>` +
+    `<div>RMS acceleration: <span class="stat-val">${result.rms.toFixed(2)}</span></div>` +
+    `<div>Time over threshold: <span class="stat-val">${overPct}%</span></div>` +
+    `<div>──────────</div>` +
+    `<div>Smoothness penalty: <span class="stat-val">-${result.rmsPenalty.toFixed(1)}</span></div>` +
+    `<div>Threshold penalty: <span class="stat-val">-${result.overPenalty.toFixed(1)}</span></div>` +
+    `<div>Peak penalty: <span class="stat-val">-${result.peakPenalty.toFixed(1)}</span></div>`;
+
+  document.getElementById('reportOverlay').classList.remove('hidden');
+}
+
+function closeReport() {
+  document.getElementById('reportOverlay').classList.add('hidden');
 }
 
 // ============ CALIBRATION ============
@@ -476,9 +638,7 @@ function startCalibration() {
   document.getElementById('threshY').disabled = true;
   document.getElementById('threshX').disabled = true;
 
-  calibrating = true;
-  calStartTime = performance.now();
-  calAccelSamples = [];
+  calibrating = true; calStartTime = performance.now(); calAccelSamples = [];
   document.getElementById('calOverlay').classList.remove('hidden');
   document.getElementById('calFill').style.width = '0%';
 }
@@ -488,7 +648,7 @@ function finishCalibration() {
   document.getElementById('calOverlay').classList.add('hidden');
 
   if (calAccelSamples.length < CAL_MIN_SAMPLES) {
-    document.getElementById('status').textContent = '❌ Not enough samples. Try again.';
+    document.getElementById('status').textContent = '❌ Not enough samples.';
     document.getElementById('threshY').disabled = false;
     document.getElementById('threshX').disabled = false;
     return;
@@ -497,50 +657,47 @@ function finishCalibration() {
   let sx = 0, sy = 0, sz = 0;
   for (const s of calAccelSamples) { sx += s.x; sy += s.y; sz += s.z; }
   const n = calAccelSamples.length;
-  const avgX = sx / n, avgY = sy / n, avgZ = sz / n;
+  const avgX = sx/n, avgY = sy/n, avgZ = sz/n;
   const mag = Math.sqrt(avgX*avgX + avgY*avgY + avgZ*avgZ);
 
   if (mag < 5) {
-    document.getElementById('status').textContent = '❌ Gravity too weak. Try again.';
+    document.getElementById('status').textContent = '❌ Gravity too weak.';
     document.getElementById('threshY').disabled = false;
     document.getElementById('threshX').disabled = false;
     return;
   }
 
-  gUnitX = avgX / mag; gUnitY = avgY / mag; gUnitZ = avgZ / mag;
+  gUnitX = avgX/mag; gUnitY = avgY/mag; gUnitZ = avgZ/mag;
   gravX = avgX; gravY = avgY; gravZ = avgZ;
 
-  // Build horizontal basis vectors
-  // Basis A (X axis): device X projected onto horizontal plane
-  let ax = 1 - gUnitX*gUnitX, ay = -gUnitX*gUnitY, az = -gUnitX*gUnitZ;
-  let alen = Math.sqrt(ax*ax + ay*ay + az*az);
-  if (alen < 0.01) {
-    ax = -gUnitY*gUnitX; ay = 1 - gUnitY*gUnitY; az = -gUnitY*gUnitZ;
-    alen = Math.sqrt(ax*ax + ay*ay + az*az);
-  }
+  let ax = 1-gUnitX*gUnitX, ay = -gUnitX*gUnitY, az = -gUnitX*gUnitZ;
+  let alen = Math.sqrt(ax*ax+ay*ay+az*az);
+  if (alen < 0.01) { ax = -gUnitY*gUnitX; ay = 1-gUnitY*gUnitY; az = -gUnitY*gUnitZ; alen = Math.sqrt(ax*ax+ay*ay+az*az); }
   basisAx = ax/alen; basisAy = ay/alen; basisAz = az/alen;
-
-  // Basis B (Y axis): gravity × basisA
-  basisBx = gUnitY*basisAz - gUnitZ*basisAy;
-  basisBy = gUnitZ*basisAx - gUnitX*basisAz;
-  basisBz = gUnitX*basisAy - gUnitY*basisAx;
-  const blen = Math.sqrt(basisBx*basisBx + basisBy*basisBy + basisBz*basisBz);
+  basisBx = gUnitY*basisAz-gUnitZ*basisAy;
+  basisBy = gUnitZ*basisAx-gUnitX*basisAz;
+  basisBz = gUnitX*basisAy-gUnitY*basisAx;
+  const blen = Math.sqrt(basisBx*basisBx+basisBy*basisBy+basisBz*basisBz);
   basisBx /= blen; basisBy /= blen; basisBz /= blen;
 
   accelHX = 0; accelHY = 0; peakX = 0; peakY = 0;
-  calibrated = true;
-  document.getElementById('resetBtn').style.display = '';
+  scoreSamples = [];
+  calibrated = true; running = true;
+  sessionStartTime = performance.now();
+
+  document.getElementById('stopBtn').style.display = '';
+  document.getElementById('resetBtn').style.display = 'none';
   document.getElementById('status').textContent =
-    `✅ Calibrated! Thresholds: Y=${THRESH_Y.toFixed(1)}, X=${THRESH_X.toFixed(1)} m/s²`;
+    `✅ Recording! Thresholds: Y=${THRESH_Y.toFixed(1)}, X=${THRESH_X.toFixed(1)}`;
 
   ensureAudioCtx();
   startSampling();
 }
 
 function recalibrate() {
-  stopSampling(); calibrated = false;
+  stopSampling(); calibrated = false; running = false;
   accelHX = 0; accelHY = 0; peakX = 0; peakY = 0;
-  dataX = []; dataY = [];
+  dataX = []; dataY = []; scoreSamples = [];
   alertState = 'ok';
   document.getElementById('alertBar').className = 'alert-bar ok';
   document.getElementById('alertBar').textContent = '✅ Comfortable';
@@ -548,8 +705,11 @@ function recalibrate() {
   document.getElementById('valY').textContent = '0.00';
   document.getElementById('peakX').textContent = '0.00';
   document.getElementById('peakY').textContent = '0.00';
+  document.getElementById('scoreContainer').style.display = 'none';
   document.getElementById('threshY').disabled = false;
   document.getElementById('threshX').disabled = false;
+  document.getElementById('stopBtn').style.display = 'none';
+  document.getElementById('resetBtn').style.display = 'none';
   drawChart(); startCalibration();
 }
 
