@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>X/Y Acceleration Chart</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0a1a; color: #e0e0e0;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: 16px; overflow-x: hidden;
+  }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; color: #7eb8ff; text-align: center; }
+  .subtitle { font-size: 0.72rem; color: #666; margin-bottom: 14px; text-align: center; }
+
+  .controls { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    border: none; padding: 12px 24px; border-radius: 12px; font-size: 0.95rem;
+    font-weight: 600; cursor: pointer; color: white; transition: transform 0.15s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-perm { background: linear-gradient(135deg, #4a90d9, #357abd); }
+  .btn-reset { background: linear-gradient(135deg, #868e96, #495057); }
+
+  .chart-label {
+    width: 100%; max-width: 460px;
+    font-size: 0.75rem; font-weight: 700; margin-bottom: 4px; padding-left: 4px;
+  }
+  .chart-label .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+
+  .chart-container {
+    width: 100%; max-width: 460px; height: 220px;
+    background: #0d0d24; border-radius: 16px; border: 1px solid #1e1e40;
+    position: relative; overflow: hidden; margin-bottom: 14px;
+  }
+  canvas { width: 100%; height: 100%; display: block; }
+
+  .info-row {
+    width: 100%; max-width: 460px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;
+  }
+  .info-card {
+    background: #12122a; border-radius: 10px; padding: 12px;
+    border: 1px solid #1e1e40; text-align: center;
+  }
+  .info-label { font-size: 0.63rem; color: #8888aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+  .info-value { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .info-value.red { color: #ff6b6b; }
+  .info-value.green { color: #51cf66; }
+  .info-value.sm { font-size: 0.95rem; color: #999; }
+
+  #status { font-size: 0.78rem; color: #888; text-align: center; margin-top: 4px; max-width: 460px; line-height: 1.4; }
+
+  .cal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.92); display: flex; flex-direction: column;
+    justify-content: center; align-items: center; z-index: 100; padding: 30px;
+  }
+  .cal-overlay.hidden { display: none; }
+  .cal-icon { font-size: 3rem; margin-bottom: 16px; }
+  .cal-title { color: #fcc419; font-size: 1.2rem; font-weight: 700; margin-bottom: 8px; }
+  .cal-desc { color: #888; font-size: 0.9rem; text-align: center; line-height: 1.5; margin-bottom: 20px; max-width: 300px; }
+  .cal-bar { width: 200px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; margin-bottom: 10px; }
+  .cal-fill { height: 100%; background: #fcc419; border-radius: 4px; transition: width 0.1s; width: 0%; }
+  .cal-status { color: #aaa; font-size: 0.8rem; }
+
+  .legend {
+    width: 100%; max-width: 460px; display: flex; justify-content: center;
+    gap: 20px; font-size: 0.75rem; color: #888; margin-bottom: 8px;
+  }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .legend .dot { width: 12px; height: 3px; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<h1>📊 Horizontal Acceleration</h1>
+<div class="subtitle">X &amp; Y acceleration in the plane ⊥ to gravity</div>
+
+<div class="controls">
+  <button class="btn btn-perm" id="permBtn" onclick="requestPermission()">Grant Sensors</button>
+  <button class="btn btn-reset" id="resetBtn" onclick="recalibrate()" style="display:none;">↻ Recalibrate</button>
+</div>
+
+<div class="legend">
+  <span><div class="dot" style="background:#ff6b6b;"></div> X axis (device left/right)</span>
+  <span><div class="dot" style="background:#51cf66;"></div> Y axis (device forward/back)</span>
+</div>
+
+<div class="chart-container">
+  <canvas id="chart"></canvas>
+</div>
+
+<div class="info-row">
+  <div class="info-card">
+    <div class="info-label">Accel X (m/s²)</div>
+    <div class="info-value red" id="valX">0.00</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">Accel Y (m/s²)</div>
+    <div class="info-value green" id="valY">0.00</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">|g| Check</div>
+    <div class="info-value sm" id="gCheck">--</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">Gravity ĝ</div>
+    <div class="info-value sm" id="gVec">--</div>
+  </div>
+</div>
+
+<div id="status">Tap "Grant Sensors" to begin</div>
+
+<div class="cal-overlay hidden" id="calOverlay">
+  <div class="cal-icon">📐</div>
+  <div class="cal-title">Calibrating Gravity Vector</div>
+  <div class="cal-desc">Hold your phone still in any position for 3 seconds. It does NOT need to be level.</div>
+  <div class="cal-bar"><div class="cal-fill" id="calFill"></div></div>
+  <div class="cal-status" id="calStatus">Collecting samples...</div>
+</div>
+
+<script>
+// ============ CONFIG ============
+const CAL_DURATION = 3000;
+const CAL_MIN_SAMPLES = 50;
+const SAMPLE_INTERVAL = 50;  // 20 fps
+const CHART_SECONDS = 10;
+const GRAV_LP = 0.97;
+
+// ============ STATE ============
+let permissionGranted = false;
+let calibrated = false;
+let calibrating = false;
+
+let calStartTime = 0;
+let calAccelSamples = [];
+
+// Gravity unit vector in device frame
+let gUnitX = 0, gUnitY = 0, gUnitZ = 1;
+
+// Two orthonormal basis vectors spanning the horizontal plane (⊥ to gravity)
+// These define the X and Y axes for our acceleration output
+let basisAx = 0, basisAy = 0, basisAz = 0; // "X" direction in device frame
+let basisBx = 0, basisBy = 0, basisBz = 0; // "Y" direction in device frame
+
+// Continuous gravity LP
+let gravX = 0, gravY = 0, gravZ = 9.8;
+let gravInited = false;
+
+// Current horizontal accelerations
+let accelHX = 0, accelHY = 0;
+
+// Chart data
+let dataX = [];
+let dataY = [];
+let chartStartTime = 0;
+let sampleTimer = null;
+
+// Canvas
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawChart();
+}
+window.addEventListener('resize', resizeCanvas);
+
+// ============ SENSOR ============
+function handleMotion(e) {
+  const now = performance.now();
+
+  const agx = e.accelerationIncludingGravity?.x || 0;
+  const agy = e.accelerationIncludingGravity?.y || 0;
+  const agz = e.accelerationIncludingGravity?.z || 0;
+
+  if (!gravInited) {
+    gravX = agx; gravY = agy; gravZ = agz; gravInited = true;
+  } else {
+    gravX = GRAV_LP * gravX + (1 - GRAV_LP) * agx;
+    gravY = GRAV_LP * gravY + (1 - GRAV_LP) * agy;
+    gravZ = GRAV_LP * gravZ + (1 - GRAV_LP) * agz;
+  }
+
+  const gMag = Math.sqrt(gravX*gravX + gravY*gravY + gravZ*gravZ);
+  document.getElementById('gCheck').textContent = gMag.toFixed(2);
+
+  // Calibration
+  if (calibrating) {
+    calAccelSamples.push({ x: agx, y: agy, z: agz });
+    const progress = Math.min((now - calStartTime) / CAL_DURATION * 100, 100);
+    document.getElementById('calFill').style.width = progress + '%';
+    document.getElementById('calStatus').textContent = `Collecting... ${calAccelSamples.length} samples`;
+    if (now - calStartTime >= CAL_DURATION) finishCalibration();
+    return;
+  }
+
+  if (!calibrated) return;
+
+  // Use e.acceleration (gravity removed by OS) for motion acceleration
+  const ax = e.acceleration?.x || 0;
+  const ay = e.acceleration?.y || 0;
+  const az = e.acceleration?.z || 0;
+
+  // Project onto horizontal basis vectors
+  accelHX = ax * basisAx + ay * basisAy + az * basisAz;
+  accelHY = ax * basisBx + ay * basisBy + az * basisBz;
+
+  document.getElementById('valX').textContent = accelHX.toFixed(2);
+  document.getElementById('valY').textContent = accelHY.toFixed(2);
+}
+
+// ============ CHART ============
+function startSampling() {
+  chartStartTime = performance.now();
+  dataX = []; dataY = [];
+  sampleTimer = setInterval(() => {
+    const t = (performance.now() - chartStartTime) / 1000;
+    dataX.push({ t, v: accelHX });
+    dataY.push({ t, v: accelHY });
+    const maxSamples = Math.ceil(CHART_SECONDS / (SAMPLE_INTERVAL / 1000)) + 20;
+    if (dataX.length > maxSamples) dataX.shift();
+    if (dataY.length > maxSamples) dataY.shift();
+    drawChart();
+  }, SAMPLE_INTERVAL);
+}
+
+function stopSampling() {
+  if (sampleTimer) { clearInterval(sampleTimer); sampleTimer = null; }
+}
+
+function drawChart() {
+  const w = canvas.width / dpr, h = canvas.height / dpr;
+  const pad = { top: 16, right: 12, bottom: 28, left: 44 };
+  const cw = w - pad.left - pad.right;
+  const ch = h - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Auto Y range
+  let maxAbs = 2;
+  for (const d of dataX) { const a = Math.abs(d.v); if (a > maxAbs) maxAbs = a; }
+  for (const d of dataY) { const a = Math.abs(d.v); if (a > maxAbs) maxAbs = a; }
+  const yRange = Math.max(1, Math.ceil(maxAbs) + 1);
+
+  const now = dataX.length > 0 ? dataX[dataX.length - 1].t : 0;
+  const tMin = now - CHART_SECONDS, tMax = now;
+
+  function xPos(t) { return pad.left + ((t - tMin) / (tMax - tMin)) * cw; }
+  function yPos(v) { return pad.top + ch / 2 - (v / yRange) * (ch / 2); }
+
+  // Background
+  ctx.fillStyle = '#0a0a18';
+  ctx.fillRect(pad.left, pad.top, cw, ch);
+
+  // H grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
+  const yStep = yRange <= 3 ? 1 : yRange <= 10 ? 2 : yRange <= 30 ? 5 : 10;
+  for (let a = -yRange; a <= yRange; a += yStep) {
+    const y = yPos(a); if (y < pad.top || y > pad.top + ch) continue;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+  }
+
+  // Zero line
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+  const zeroY = yPos(0);
+  ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(pad.left + cw, zeroY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // V grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
+  const tStep = CHART_SECONDS <= 5 ? 1 : CHART_SECONDS <= 15 ? 2 : 5;
+  const firstT = Math.ceil(tMin / tStep) * tStep;
+  for (let t = firstT; t <= tMax; t += tStep) {
+    const x = xPos(t); if (x < pad.left || x > pad.left + cw) continue;
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + ch); ctx.stroke();
+  }
+
+  // Y labels
+  ctx.fillStyle = '#555'; ctx.font = '9px -apple-system,sans-serif';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let a = -yRange; a <= yRange; a += yStep) {
+    const y = yPos(a); if (y < pad.top + 5 || y > pad.top + ch - 5) continue;
+    ctx.fillText(a.toFixed(0), pad.left - 5, y);
+  }
+
+  // X labels
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let t = firstT; t <= tMax; t += tStep) {
+    const x = xPos(t); if (x < pad.left + 10 || x > pad.left + cw - 10) continue;
+    ctx.fillText(t.toFixed(0) + 's', x, pad.top + ch + 4);
+  }
+
+  // Axis titles
+  ctx.fillStyle = '#444'; ctx.font = '8px -apple-system,sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('Time (s)', pad.left + cw / 2, h - 2);
+  ctx.save(); ctx.translate(8, pad.top + ch / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillText('m/s²', 0, 0); ctx.restore();
+
+  // Clip
+  ctx.save(); ctx.beginPath(); ctx.rect(pad.left, pad.top, cw, ch); ctx.clip();
+
+  // Draw helper function
+  function drawLine(data, color) {
+    if (data.length < 2) return;
+
+    // Fill
+    ctx.beginPath();
+    let started = false;
+    for (const d of data) {
+      if (d.t < tMin) continue;
+      const x = xPos(d.t), y = yPos(d.v);
+      if (!started) { ctx.moveTo(x, zeroY); ctx.lineTo(x, y); started = true; }
+      else ctx.lineTo(x, y);
+    }
+    if (started) {
+      ctx.lineTo(xPos(data[data.length - 1].t), zeroY); ctx.closePath();
+      ctx.fillStyle = color.replace('1)', '0.06)');
+      ctx.fill();
+    }
+
+    // Line
+    ctx.beginPath(); started = false;
+    for (const d of data) {
+      if (d.t < tMin) continue;
+      const x = xPos(d.t), y = yPos(d.v);
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+
+    // End dot
+    const last = data[data.length - 1];
+    const lx = xPos(last.t), ly = yPos(last.v);
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(lx, ly, 3.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  drawLine(dataX, 'rgba(255,107,107,1)');
+  drawLine(dataY, 'rgba(81,207,102,1)');
+
+  ctx.restore();
+
+  // Border
+  ctx.strokeStyle = '#1e1e40'; ctx.lineWidth = 1;
+  ctx.strokeRect(pad.left, pad.top, cw, ch);
+}
+
+// ============ CALIBRATION ============
+function startCalibration() {
+  calibrating = true;
+  calStartTime = performance.now();
+  calAccelSamples = [];
+  document.getElementById('calOverlay').classList.remove('hidden');
+  document.getElementById('calFill').style.width = '0%';
+}
+
+function finishCalibration() {
+  calibrating = false;
+  document.getElementById('calOverlay').classList.add('hidden');
+
+  if (calAccelSamples.length < CAL_MIN_SAMPLES) {
+    document.getElementById('status').textContent = '❌ Not enough samples. Try again.';
+    return;
+  }
+
+  let sx = 0, sy = 0, sz = 0;
+  for (const s of calAccelSamples) { sx += s.x; sy += s.y; sz += s.z; }
+  const n = calAccelSamples.length;
+  const avgX = sx / n, avgY = sy / n, avgZ = sz / n;
+  const mag = Math.sqrt(avgX*avgX + avgY*avgY + avgZ*avgZ);
+
+  if (mag < 5) {
+    document.getElementById('status').textContent = '❌ Gravity too weak. Try again.';
+    return;
+  }
+
+  // Gravity unit vector
+  gUnitX = avgX / mag;
+  gUnitY = avgY / mag;
+  gUnitZ = avgZ / mag;
+  gravX = avgX; gravY = avgY; gravZ = avgZ;
+
+  // Build two orthonormal basis vectors in the horizontal plane (⊥ to gravity)
+  // Basis A: project device X axis (1,0,0) onto horizontal plane
+  let ax = 1 - gUnitX * gUnitX;
+  let ay = 0 - gUnitX * gUnitY;
+  let az = 0 - gUnitX * gUnitZ;
+  let alen = Math.sqrt(ax*ax + ay*ay + az*az);
+
+  if (alen < 0.01) {
+    // Gravity is along device X, use device Y instead
+    ax = 0 - gUnitY * gUnitX;
+    ay = 1 - gUnitY * gUnitY;
+    az = 0 - gUnitY * gUnitZ;
+    alen = Math.sqrt(ax*ax + ay*ay + az*az);
+  }
+
+  basisAx = ax / alen;
+  basisAy = ay / alen;
+  basisAz = az / alen;
+
+  // Basis B: cross product of gravity × basisA
+  basisBx = gUnitY * basisAz - gUnitZ * basisAy;
+  basisBy = gUnitZ * basisAx - gUnitX * basisAz;
+  basisBz = gUnitX * basisAy - gUnitY * basisAx;
+  const blen = Math.sqrt(basisBx*basisBx + basisBy*basisBy + basisBz*basisBz);
+  basisBx /= blen; basisBy /= blen; basisBz /= blen;
+
+  document.getElementById('gVec').textContent =
+    `(${gUnitX.toFixed(2)}, ${gUnitY.toFixed(2)}, ${gUnitZ.toFixed(2)})`;
+
+  accelHX = 0; accelHY = 0;
+  calibrated = true;
+  document.getElementById('resetBtn').style.display = '';
+  document.getElementById('status').textContent = '✅ Calibrated! Move your phone in the horizontal plane.';
+
+  startSampling();
+}
+
+function recalibrate() {
+  stopSampling(); calibrated = false;
+  accelHX = 0; accelHY = 0;
+  dataX = []; dataY = [];
+  document.getElementById('valX').textContent = '0.00';
+  document.getElementById('valY').textContent = '0.00';
+  drawChart(); startCalibration();
+}
+
+// ============ PERMISSION ============
+function requestPermission() {
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    DeviceMotionEvent.requestPermission()
+      .then(state => {
+        if (state === 'granted') onPermGranted();
+        else document.getElementById('status').textContent = '❌ Permission denied';
+      })
+      .catch(err => { document.getElementById('status').textContent = '❌ ' + err.message; });
+  } else { onPermGranted(); }
+}
+
+function onPermGranted() {
+  permissionGranted = true;
+  window.addEventListener('devicemotion', handleMotion, true);
+  document.getElementById('permBtn').disabled = true;
+  document.getElementById('permBtn').textContent = '✅ Granted';
+  startCalibration();
+}
+
+resizeCanvas(); drawChart();
+</script>
+</body>
+</html>
