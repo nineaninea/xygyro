@@ -42,7 +42,6 @@
   .setting-input:disabled { opacity: 0.4; }
   .setting-unit { font-size: 0.75rem; color: #666; margin-left: 6px; min-width: 40px; }
 
-  /* Score display */
   .score-container {
     width: 100%; max-width: 460px; display: flex; align-items: center;
     gap: 14px; margin-bottom: 14px;
@@ -53,7 +52,7 @@
     border: 3px solid; flex-shrink: 0; transition: border-color 0.3s;
   }
   .score-number { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
-  .score-label { font-size: 0.55rem; color: #888; text-transform: uppercase; margin-top: 2px; }
+  .score-label { font-size: 0.55rem; color: #888; margin-top: 2px; }
   .score-detail { flex: 1; }
   .score-grade { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
   .score-breakdown { font-size: 0.7rem; color: #777; line-height: 1.5; }
@@ -100,7 +99,6 @@
 
   #status { font-size: 0.78rem; color: #888; text-align: center; margin-top: 4px; max-width: 460px; line-height: 1.4; }
 
-  /* Final report overlay */
   .report-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0,0,0,0.92); display: flex; flex-direction: column;
@@ -140,7 +138,7 @@
 <body>
 
 <h1>🚗 Driving Comfort Monitor</h1>
-<div class="subtitle">Real-time comfort scoring with audio alerts</div>
+<div class="subtitle">Real-time acceleration · Audio alerts · Comfort scoring</div>
 
 <div class="controls">
   <button class="btn btn-perm" id="permBtn" onclick="requestPermission()">Grant Sensors</button>
@@ -151,18 +149,17 @@
 <div class="settings" id="settingsPanel">
   <div class="settings-title">⚙️ Alert Thresholds (editable before calibration)</div>
   <div class="setting-row">
-    <span class="setting-label">🔴 Y (accel/brake) beep</span>
+    <span class="setting-label">🔴 Accel/Brake threshold</span>
     <input type="number" class="setting-input" id="threshY" value="3.0" step="0.1" min="0.5" max="20">
     <span class="setting-unit">m/s²</span>
   </div>
   <div class="setting-row">
-    <span class="setting-label">🟡 X (turning) dong</span>
+    <span class="setting-label">🟡 Turning threshold</span>
     <input type="number" class="setting-input" id="threshX" value="2.5" step="0.1" min="0.5" max="20">
     <span class="setting-unit">m/s²</span>
   </div>
 </div>
 
-<!-- Score -->
 <div class="score-container" id="scoreContainer" style="display:none;">
   <div class="score-circle" id="scoreCircle">
     <div class="score-number" id="scoreNumber">100</div>
@@ -177,8 +174,8 @@
 <div class="alert-bar ok" id="alertBar">✅ Comfortable</div>
 
 <div class="legend">
-  <span><div class="dot" style="background:#ff6b6b;"></div> X (turning)</span>
-  <span><div class="dot" style="background:#51cf66;"></div> Y (accel/brake)</span>
+  <span><div class="dot" style="background:#ff6b6b;"></div> Turning accel</span>
+  <span><div class="dot" style="background:#51cf66;"></div> Accel/Brake</span>
 </div>
 
 <div class="chart-container">
@@ -187,26 +184,26 @@
 
 <div class="info-row">
   <div class="info-card">
-    <div class="info-label">Accel X (m/s²)</div>
+    <div class="info-label">Current turning accel (m/s²)</div>
     <div class="info-value red" id="valX">0.00</div>
   </div>
   <div class="info-card">
-    <div class="info-label">Accel Y (m/s²)</div>
+    <div class="info-label">Current accel/brake (m/s²)</div>
     <div class="info-value green" id="valY">0.00</div>
   </div>
   <div class="info-card">
-    <div class="info-label">Peak X</div>
+    <div class="info-label">Turning peak</div>
     <div class="info-value sm" id="peakX">0.00</div>
   </div>
   <div class="info-card">
-    <div class="info-label">Peak Y</div>
+    <div class="info-label">Accel/Brake peak</div>
     <div class="info-value sm" id="peakY">0.00</div>
   </div>
 </div>
 
 <div id="status">Tap "Grant Sensors" to begin</div>
 
-<!-- Calibration overlay -->
+<!-- Calibration -->
 <div class="cal-overlay hidden" id="calOverlay">
   <div class="cal-icon">📐</div>
   <div class="cal-title">Calibrating Gravity Vector</div>
@@ -214,13 +211,13 @@
     Hold your phone <em>upright (portrait)</em> and keep it still for 3 seconds.<br><br>
     ✅ Tilting is OK<br>
     ❌ Do NOT hold it sideways (landscape)<br><br>
-    The phone's top edge should point up, not to the side.
+    The phone&#39;s top edge should point up, not to the side.
   </div>
   <div class="cal-bar"><div class="cal-fill" id="calFill"></div></div>
-  <div class="cal-status" id="calStatus">Collecting samples...</div>
+  <div class="cal-status" id="calStatus">Collecting...</div>
 </div>
 
-<!-- Final report overlay -->
+<!-- Trip Report -->
 <div class="report-overlay hidden" id="reportOverlay">
   <div class="report-card">
     <div class="report-title">🏁 Trip Report</div>
@@ -269,7 +266,6 @@ function playDong() {
 let alertState = 'ok';
 let soundTimer = null;
 let bothToggle = false;
-
 function startAlertLoop() {
   if (soundTimer) return;
   soundTimer = setInterval(() => {
@@ -286,60 +282,46 @@ function updateAlert() {
   const bar = document.getElementById('alertBar');
   if (overX && overY) {
     if (alertState !== 'both') { alertState = 'both'; bothToggle = false; }
-    bar.className = 'alert-bar warn-both'; bar.textContent = '⚠️ X & Y OVER THRESHOLD!';
+    bar.className = 'alert-bar warn-both'; bar.textContent = '⚠️ TURNING & ACCEL OVER THRESHOLD!';
   } else if (overY) {
     alertState = 'y'; bar.className = 'alert-bar warn-y';
-    bar.textContent = '⚠️ Y (Accel/Brake) Over ' + THRESH_Y.toFixed(1);
+    bar.textContent = '⚠️ Accel/Brake over ' + THRESH_Y.toFixed(1);
   } else if (overX) {
     alertState = 'x'; bar.className = 'alert-bar warn-x';
-    bar.textContent = '⚠️ X (Turning) Over ' + THRESH_X.toFixed(1);
+    bar.textContent = '⚠️ Turning over ' + THRESH_X.toFixed(1);
   } else {
     alertState = 'ok'; bar.className = 'alert-bar ok'; bar.textContent = '✅ Comfortable';
   }
 }
 
-// ============ SCORING ============
-// Score = 100 - penalty
-// Penalties:
-//   1. RMS penalty: rms of combined accel / threshold, scaled (0-30 pts)
-//   2. Over-threshold time ratio (0-40 pts)
-//   3. Peak penalty: how far peaks exceeded thresholds (0-30 pts)
+// ============ INCREMENTAL SCORING ============
+// No memory growth: only keep running stats
+let totalSamples = 0;
+let sumSqNorm = 0;    // sum of (ax/thX)^2 + (ay/thY)^2
+let overCount = 0;     // samples over threshold
+let peakX = 0, peakY = 0;
 
-let scoreSamples = []; // { ax, ay } all samples for final scoring
-let scoreTimer = null;
+function addScoreSample(ax, ay) {
+  totalSamples++;
+  const nx = ax / THRESH_X, ny = ay / THRESH_Y;
+  sumSqNorm += nx * nx + ny * ny;
+  if (Math.abs(ax) > THRESH_X || Math.abs(ay) > THRESH_Y) overCount++;
+  const absX = Math.abs(ax), absY = Math.abs(ay);
+  if (absX > peakX) peakX = absX;
+  if (absY > peakY) peakY = absY;
+}
 
 function calcScore() {
-  if (scoreSamples.length < 10) return { score: 100, grade: '🌟 Excellent', rms: 0, overPct: 0, peakPenalty: 0 };
+  if (totalSamples < 10) return { score: 100, grade: '🌟 Excellent', rms: 0, overPct: 0, rmsPenalty: 0, overPenalty: 0, peakPenalty: 0 };
 
-  // RMS of normalized acceleration
-  let sumSq = 0;
-  let overCount = 0;
-  let maxOverX = 0, maxOverY = 0;
+  const rms = Math.sqrt(sumSqNorm / totalSamples);
+  const overPct = overCount / totalSamples;
 
-  for (const s of scoreSamples) {
-    const nx = s.ax / THRESH_X;
-    const ny = s.ay / THRESH_Y;
-    sumSq += nx * nx + ny * ny;
+  const maxOverX = Math.max(0, peakX - THRESH_X);
+  const maxOverY = Math.max(0, peakY - THRESH_Y);
 
-    if (Math.abs(s.ax) > THRESH_X || Math.abs(s.ay) > THRESH_Y) overCount++;
-
-    const ox = Math.max(0, Math.abs(s.ax) - THRESH_X);
-    const oy = Math.max(0, Math.abs(s.ay) - THRESH_Y);
-    if (ox > maxOverX) maxOverX = ox;
-    if (oy > maxOverY) maxOverY = oy;
-  }
-
-  const rms = Math.sqrt(sumSq / scoreSamples.length);
-  const overPct = overCount / scoreSamples.length;
-
-  // Penalties
-  // RMS penalty: rms of 0.5 is very smooth, 1.0 = at threshold, >1.5 = rough
   const rmsPenalty = Math.min(30, rms * 20);
-
-  // Over-threshold time penalty: 0% = 0pts, 5% = 10pts, 20% = 40pts
   const overPenalty = Math.min(40, overPct * 200);
-
-  // Peak penalty: how much over threshold
   const peakOver = (maxOverX / THRESH_X + maxOverY / THRESH_Y) / 2;
   const peakPenalty = Math.min(30, peakOver * 15);
 
@@ -352,7 +334,7 @@ function calcScore() {
   else if (score >= 40) grade = '😬 Rough';
   else grade = '🤢 Very Rough';
 
-  return { score, grade, rms, overPct, peakPenalty, rmsPenalty, overPenalty };
+  return { score, grade, rms, overPct, rmsPenalty, overPenalty, peakPenalty };
 }
 
 function getScoreColor(score) {
@@ -363,29 +345,24 @@ function getScoreColor(score) {
   return '#ff6b6b';
 }
 
+let scoreTimer = null;
 function updateScoreDisplay() {
-  const result = calcScore();
-  const color = getScoreColor(result.score);
-
-  document.getElementById('scoreNumber').textContent = result.score;
-  document.getElementById('scoreNumber').style.color = color;
-  document.getElementById('scoreCircle').style.borderColor = color;
-  document.getElementById('scoreGrade').textContent = result.grade;
-  document.getElementById('scoreGrade').style.color = color;
-
-  const overPctStr = (result.overPct * 100).toFixed(1);
+  const r = calcScore();
+  const c = getScoreColor(r.score);
+  document.getElementById('scoreNumber').textContent = r.score;
+  document.getElementById('scoreNumber').style.color = c;
+  document.getElementById('scoreCircle').style.borderColor = c;
+  document.getElementById('scoreGrade').textContent = r.grade;
+  document.getElementById('scoreGrade').style.color = c;
+  const overStr = (r.overPct * 100).toFixed(1);
   document.getElementById('scoreBreakdown').textContent =
-    `RMS: ${result.rms.toFixed(2)} | Over threshold: ${overPctStr}% | Samples: ${scoreSamples.length}`;
+    `RMS: ${r.rms.toFixed(2)} | Over threshold: ${overStr}% | Samples: ${totalSamples}`;
 }
-
 function startScoreUpdates() {
   document.getElementById('scoreContainer').style.display = 'flex';
   scoreTimer = setInterval(updateScoreDisplay, SCORE_UPDATE_MS);
 }
-
-function stopScoreUpdates() {
-  if (scoreTimer) { clearInterval(scoreTimer); scoreTimer = null; }
-}
+function stopScoreUpdates() { if (scoreTimer) { clearInterval(scoreTimer); scoreTimer = null; } }
 
 // ============ STATE ============
 let permissionGranted = false;
@@ -404,7 +381,6 @@ let gravX = 0, gravY = 0, gravZ = 9.8;
 let gravInited = false;
 
 let accelHX = 0, accelHY = 0;
-let peakX = 0, peakY = 0;
 
 let dataX = [], dataY = [];
 let chartStartTime = 0;
@@ -454,12 +430,7 @@ function handleMotion(e) {
   accelHX = ax * basisAx + ay * basisAy + az * basisAz;
   accelHY = ax * basisBx + ay * basisBy + az * basisBz;
 
-  const absX = Math.abs(accelHX), absY = Math.abs(accelHY);
-  if (absX > peakX) peakX = absX;
-  if (absY > peakY) peakY = absY;
-
-  // Collect for scoring
-  scoreSamples.push({ ax: accelHX, ay: accelHY });
+  addScoreSample(accelHX, accelHY);
 
   document.getElementById('valX').textContent = accelHX.toFixed(2);
   document.getElementById('valY').textContent = accelHY.toFixed(2);
@@ -481,8 +452,7 @@ function startSampling() {
     if (dataY.length > maxSamples) dataY.shift();
     drawChart();
   }, SAMPLE_INTERVAL);
-  startAlertLoop();
-  startScoreUpdates();
+  startAlertLoop(); startScoreUpdates();
 }
 
 function stopSampling() {
@@ -527,9 +497,9 @@ function drawChart() {
 
   ctx.font = '8px -apple-system,sans-serif';
   ctx.fillStyle = 'rgba(255,107,107,0.4)'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-  ctx.fillText('Y ±' + THRESH_Y.toFixed(1), pad.left + cw - 4, yTT - 2);
+  ctx.fillText('Brake/Accel ±' + THRESH_Y.toFixed(1), pad.left + cw - 4, yTT - 2);
   ctx.fillStyle = 'rgba(252,196,25,0.4)'; ctx.textBaseline = 'top';
-  ctx.fillText('X ±' + THRESH_X.toFixed(1), pad.left + cw - 4, xTT + 2);
+  ctx.fillText('Turn ±' + THRESH_X.toFixed(1), pad.left + cw - 4, xTT + 2);
 
   // Grid
   ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
@@ -588,22 +558,23 @@ function drawChart() {
 
 // ============ SESSION ============
 function stopSession() {
-  running = false;
-  stopSampling();
+  running = false; stopSampling();
   alertState = 'ok';
   document.getElementById('alertBar').className = 'alert-bar ok';
   document.getElementById('alertBar').textContent = '⏹ Stopped';
   document.getElementById('stopBtn').style.display = 'none';
   document.getElementById('resetBtn').style.display = '';
 
-  // Final score
   const result = calcScore();
   updateScoreDisplay();
   showReport(result);
 }
 
 function showReport(result) {
-  const duration = ((performance.now() - sessionStartTime) / 1000).toFixed(1);
+  const duration = ((performance.now() - sessionStartTime) / 1000);
+  const min = Math.floor(duration / 60);
+  const sec = (duration % 60).toFixed(0);
+  const durStr = min > 0 ? `${min}m ${sec}s` : `${sec}s`;
   const color = getScoreColor(result.score);
 
   document.getElementById('reportScore').textContent = result.score;
@@ -613,11 +584,11 @@ function showReport(result) {
 
   const overPct = (result.overPct * 100).toFixed(1);
   document.getElementById('reportStats').innerHTML =
-    `<div>Duration: <span class="stat-val">${duration}s</span></div>` +
-    `<div>Total samples: <span class="stat-val">${scoreSamples.length}</span></div>` +
-    `<div>Peak X (turning): <span class="stat-val">${peakX.toFixed(2)} m/s²</span></div>` +
-    `<div>Peak Y (accel/brake): <span class="stat-val">${peakY.toFixed(2)} m/s²</span></div>` +
-    `<div>RMS acceleration: <span class="stat-val">${result.rms.toFixed(2)}</span></div>` +
+    `<div>Duration: <span class="stat-val">${durStr}</span></div>` +
+    `<div>Total samples：<span class="stat-val">${totalSamples}</span></div>` +
+    `<div>Turning peak: <span class="stat-val">${peakX.toFixed(2)} m/s²</span></div>` +
+    `<div>Accel/Brake peak: <span class="stat-val">${peakY.toFixed(2)} m/s²</span></div>` +
+    `<div>Accel RMS: <span class="stat-val">${result.rms.toFixed(2)}</span></div>` +
     `<div>Time over threshold: <span class="stat-val">${overPct}%</span></div>` +
     `<div>──────────</div>` +
     `<div>Smoothness penalty: <span class="stat-val">-${result.rmsPenalty.toFixed(1)}</span></div>` +
@@ -627,9 +598,7 @@ function showReport(result) {
   document.getElementById('reportOverlay').classList.remove('hidden');
 }
 
-function closeReport() {
-  document.getElementById('reportOverlay').classList.add('hidden');
-}
+function closeReport() { document.getElementById('reportOverlay').classList.add('hidden'); }
 
 // ============ CALIBRATION ============
 function startCalibration() {
@@ -648,7 +617,7 @@ function finishCalibration() {
   document.getElementById('calOverlay').classList.add('hidden');
 
   if (calAccelSamples.length < CAL_MIN_SAMPLES) {
-    document.getElementById('status').textContent = '❌ Not enough samples.';
+    document.getElementById('status').textContent = '❌ Not enough samples. Try again.';
     document.getElementById('threshY').disabled = false;
     document.getElementById('threshX').disabled = false;
     return;
@@ -661,7 +630,7 @@ function finishCalibration() {
   const mag = Math.sqrt(avgX*avgX + avgY*avgY + avgZ*avgZ);
 
   if (mag < 5) {
-    document.getElementById('status').textContent = '❌ Gravity too weak.';
+    document.getElementById('status').textContent = '❌ Gravity too weak. Try again.';
     document.getElementById('threshY').disabled = false;
     document.getElementById('threshX').disabled = false;
     return;
@@ -681,14 +650,14 @@ function finishCalibration() {
   basisBx /= blen; basisBy /= blen; basisBz /= blen;
 
   accelHX = 0; accelHY = 0; peakX = 0; peakY = 0;
-  scoreSamples = [];
+  totalSamples = 0; sumSqNorm = 0; overCount = 0;
   calibrated = true; running = true;
   sessionStartTime = performance.now();
 
   document.getElementById('stopBtn').style.display = '';
   document.getElementById('resetBtn').style.display = 'none';
   document.getElementById('status').textContent =
-    `✅ Recording! Thresholds: Y=${THRESH_Y.toFixed(1)}, X=${THRESH_X.toFixed(1)}`;
+    `✅ Calibrated! Thresholds: Brake=${THRESH_Y.toFixed(1)}, Turn=${THRESH_X.toFixed(1)} m/s²`;
 
   ensureAudioCtx();
   startSampling();
@@ -697,7 +666,8 @@ function finishCalibration() {
 function recalibrate() {
   stopSampling(); calibrated = false; running = false;
   accelHX = 0; accelHY = 0; peakX = 0; peakY = 0;
-  dataX = []; dataY = []; scoreSamples = [];
+  totalSamples = 0; sumSqNorm = 0; overCount = 0;
+  dataX = []; dataY = [];
   alertState = 'ok';
   document.getElementById('alertBar').className = 'alert-bar ok';
   document.getElementById('alertBar').textContent = '✅ Comfortable';
